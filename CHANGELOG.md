@@ -1,5 +1,54 @@
 # Changelog
 
+## [1.2.0](https://github.com/canonical/hydra-operator/compare/v1.1.8...v1.2.0) (2025-07-09)
+
+
+### Features
+
+* add name to the create and update actions ([38f3b33](https://github.com/canonical/hydra-operator/commit/38f3b333b4f90a6209342308220e7451078ec636))
+* expose client-uri via cli ([09e92b1](https://github.com/canonical/hydra-operator/commit/09e92b1e3ce5c4bd54c68fde06a421ec215f7475))
+* expose contacts via cli ([8f007cc](https://github.com/canonical/hydra-operator/commit/8f007cc78d1a616590eeb28dd35798270ebdd504))
+
+
+### Bug Fixes
+
+* add serializer for metadata ([f10cf75](https://github.com/canonical/hydra-operator/commit/f10cf758b62ab5914cfb82e51349f5bb58c730d1))
+
+## [1.1.8](https://github.com/canonical/hydra-operator/compare/v1.1.7...v1.1.8) (2025-07-08)
+
+
+### Bug Fixes
+
+* do not always set maintenance status ([de9678c](https://github.com/canonical/hydra-operator/commit/de9678c84b7c796340eb1be39ab96a79f030e061))
+* don't restart service if config didn't change ([3d7f6b3](https://github.com/canonical/hydra-operator/commit/3d7f6b3de94a1473523e3f62ac4a110b1668dda1))
+* use storedstate to check if config changed ([1e8d58e](https://github.com/canonical/hydra-operator/commit/1e8d58e779be990025d1034b7247e6f5f8ddab13))
+
+## [1.1.7](https://github.com/canonical/hydra-operator/compare/v1.1.6...v1.1.7) (2025-07-04)
+
+
+### Bug Fixes
+
+* use proper charm name ([7044ff3](https://github.com/canonical/hydra-operator/commit/7044ff3dd6e23a4034fab806b11691c5b098d7b3))
+
+## [1.1.6](https://github.com/canonical/hydra-operator/compare/v1.1.5...v1.1.6) (2025-07-02)
+
+
+### Bug Fixes
+
+* update to juju 0.20 and switch to use endpoints ([7bf6da8](https://github.com/canonical/hydra-operator/commit/7bf6da837b46486ebec50b25457ae69b1a253a23))
+* update to use juju 0.20 ([107cb5b](https://github.com/canonical/hydra-operator/commit/107cb5bed828617b88d7783c9637eaf6e31c1764))
+
+## [1.1.5](https://github.com/canonical/hydra-operator/compare/v1.1.4...v1.1.5) (2025-06-30)
+
+
+### Bug Fixes
+
+* add token hook integration ([8807ab4](https://github.com/canonical/hydra-operator/commit/8807ab42313781fe72d5e5e4ab602ed06e209a3c))
+* block the charm when public ingress is not secured in non-dev mode ([d2df5c1](https://github.com/canonical/hydra-operator/commit/d2df5c1ec0dd358caa05238d0fb948c1f975a0ba))
+* fix tests ([db5c0ff](https://github.com/canonical/hydra-operator/commit/db5c0ff0ca6db95789890f9a7dd51479fd8fb8a3))
+* fix the issue that disregards the dev mode when dev config is set to true ([4a0ee32](https://github.com/canonical/hydra-operator/commit/4a0ee32026212bc229539dcc49e64455f59ce2d1))
+* mark ui relation as mandatory ([b3b82bd](https://github.com/canonical/hydra-operator/commit/b3b82bd0d9c3bbca87294b60b864a06b2e1b81a8))
+
 ## [1.1.4](https://github.com/canonical/hydra-operator/compare/v1.1.3...v1.1.4) (2025-05-09)
 
 

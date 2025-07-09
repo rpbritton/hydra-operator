@@ -5,7 +5,7 @@ from typing import Generator
 from unittest.mock import MagicMock, PropertyMock, create_autospec
 
 import pytest
-from ops import Container, EventBase, Unit
+from ops import BoundStoredState, Container, EventBase, Unit
 from ops.testing import Harness
 from pytest_mock import MockerFixture
 from yarl import URL
@@ -13,6 +13,7 @@ from yarl import URL
 from charm import HydraCharm
 from constants import (
     DATABASE_INTEGRATION_NAME,
+    HYDRA_TOKEN_HOOK_INTEGRATION_NAME,
     LOGIN_UI_INTEGRATION_NAME,
     OAUTH_INTEGRATION_NAME,
     PEER_INTEGRATION_NAME,
@@ -39,6 +40,13 @@ def mocked_k8s_resource_patch(mocker: MockerFixture) -> None:
 @pytest.fixture
 def mocked_container() -> MagicMock:
     return create_autospec(Container)
+
+
+@pytest.fixture
+def mocked_stored_state() -> MagicMock:
+    m = create_autospec(BoundStoredState)
+    m.config_hash = None
+    return m
 
 
 @pytest.fixture
@@ -108,6 +116,11 @@ def peer_integration(harness: Harness) -> int:
 @pytest.fixture
 def database_integration(harness: Harness) -> int:
     return harness.add_relation(DATABASE_INTEGRATION_NAME, "postgresql-k8s")
+
+
+@pytest.fixture
+def token_hook_integration(harness: Harness) -> int:
+    return harness.add_relation(HYDRA_TOKEN_HOOK_INTEGRATION_NAME, "hook-provider")
 
 
 @pytest.fixture

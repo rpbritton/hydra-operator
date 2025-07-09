@@ -29,6 +29,25 @@ class TestCharmConfig:
 
         assert actual == expected
 
+    @pytest.mark.parametrize(
+        "config, expected",
+        [
+            (
+                {"dev": True},
+                {"DEV": "true"},
+            ),
+            (
+                {"dev": False},
+                {"DEV": "false"},
+            ),
+        ],
+    )
+    def test_to_env_vars(self, harness: Harness, config: dict, expected: dict) -> None:
+        harness.update_config(config)
+        actual = CharmConfig(harness.charm.config).to_env_vars()
+
+        assert actual == expected
+
 
 class TestConfigFile:
     @pytest.fixture
@@ -45,4 +64,4 @@ class TestConfigFile:
         with patch("builtins.open", mock_open(read_data=config_template)):
             config_file = ConfigFile.from_sources(source, another_source)
 
-        assert config_file == f"{DEFAULT_OAUTH_SCOPES} and value1 and value2"
+        assert str(config_file) == f"{DEFAULT_OAUTH_SCOPES} and value1 and value2"

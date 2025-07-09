@@ -17,6 +17,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.hydra.v0.hydra_endpoints import HydraEndpointsProvider
+from charms.hydra.v0.hydra_token_hook import HydraHookRequirer
 from charms.hydra.v0.oauth import ClientChangedEvent, ClientCreatedEvent, OAuthProvider
 from charms.identity_platform_login_ui_operator.v0.login_ui_endpoints import (
     LoginUIEndpointsRequirer,
@@ -36,6 +37,7 @@ from charms.traefik_k8s.v2.ingress import (
     IngressPerAppRequirer,
     IngressPerAppRevokedEvent,
 )
+from ops import StoredState
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -61,6 +63,7 @@ from constants import (
     DATABASE_INTEGRATION_NAME,
     DEFAULT_OAUTH_SCOPES,
     GRAFANA_DASHBOARD_INTEGRATION_NAME,
+    HYDRA_TOKEN_HOOK_INTEGRATION_NAME,
     INTERNAL_INGRESS_INTEGRATION_NAME,
     LOGGING_RELATION_NAME,
     LOGIN_UI_INTEGRATION_NAME,
@@ -82,6 +85,7 @@ from exceptions import (
 )
 from integrations import (
     DatabaseConfig,
+    HydraHookData,
     InternalIngressData,
     LoginUIEndpointData,
     PeerData,
@@ -103,6 +107,8 @@ logger = logging.getLogger(__name__)
 
 
 class HydraCharm(CharmBase):
+    _stored = StoredState()
+
     def __init__(self, *args: Any) -> None:
         super().__init__(*args)
 
@@ -112,8 +118,13 @@ class HydraCharm(CharmBase):
 
         self._container = self.unit.get_container(WORKLOAD_CONTAINER)
         self._workload_service = WorkloadService(self.unit)
-        self._pebble_service = PebbleService(self.unit)
+        self._pebble_service = PebbleService(self.unit, self._stored)
         self._cli = CommandLine(self._container)
+
+        self.token_hook = HydraHookRequirer(
+            self,
+            relation_name=HYDRA_TOKEN_HOOK_INTEGRATION_NAME,
+        )
 
         self.database_requirer = DatabaseRequires(
             self,
@@ -190,6 +201,10 @@ class HydraCharm(CharmBase):
         self.framework.observe(self.on.update_status, self._holistic_handler)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
+
+        # hooks
+        self.framework.observe(self.token_hook.on.ready, self._holistic_handler)
+        self.framework.observe(self.token_hook.on.unavailable, self._holistic_handler)
 
         # database
         self.framework.observe(
@@ -290,7 +305,10 @@ class HydraCharm(CharmBase):
     @property
     def _pebble_layer(self) -> Layer:
         tracing_data = TracingData.load(self.tracing_requirer)
-        return self._pebble_service.render_pebble_layer(tracing_data)
+        return self._pebble_service.render_pebble_layer(
+            self.charm_config,
+            tracing_data,
+        )
 
     @property
     def migration_needed(self) -> bool:
@@ -300,7 +318,12 @@ class HydraCharm(CharmBase):
         database_config = DatabaseConfig.load(self.database_requirer)
         return self.peer_data[database_config.migration_version] != self._workload_service.version
 
+    @property
+    def dev_mode(self) -> bool:
+        return self.charm_config["dev"]
+
     def _on_hydra_pebble_ready(self, event: WorkloadEvent) -> None:
+        self.unit.status = MaintenanceStatus("Configuring resources")
         if not container_connectivity(self):
             event.defer()
             self.unit.status = WaitingStatus("Container is not connected yet")
@@ -319,29 +342,35 @@ class HydraCharm(CharmBase):
             self.secrets[SYSTEM_SECRET_LABEL] = {SYSTEM_SECRET_KEY: token_hex(16)}
 
     def _on_config_changed(self, event: ConfigChangedEvent) -> None:
+        self.unit.status = MaintenanceStatus("Configuring resources")
         self._holistic_handler(event)
         self._on_oauth_integration_created(event)
 
     def _on_public_ingress_ready(self, event: IngressPerAppReadyEvent) -> None:
+        self.unit.status = MaintenanceStatus("Configuring resources")
         self._holistic_handler(event)
         self._on_oauth_integration_created(event)
         self._on_hydra_endpoints_ready(event)
 
     def _on_admin_ingress_ready(self, event: IngressPerAppReadyEvent) -> None:
+        self.unit.status = MaintenanceStatus("Configuring resources")
         self._on_hydra_endpoints_ready(event)
 
     def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent) -> None:
+        self.unit.status = MaintenanceStatus("Configuring resources")
         self._holistic_handler(event)
         self._on_oauth_integration_created(event)
         self._on_hydra_endpoints_ready(event)
 
     @leader_unit
     def _on_internal_ingress_joined(self, event: RelationJoinedEvent) -> None:
+        self.unit.status = MaintenanceStatus("Configuring resources")
         self.internal_ingress._relation = event.relation
         self._on_internal_ingress_changed(event)
 
     @leader_unit
     def _on_internal_ingress_changed(self, event: RelationEvent) -> None:
+        self.unit.status = MaintenanceStatus("Configuring resources")
         if self.internal_ingress.is_ready():
             internal_ingress_config = InternalIngressData.load(self.internal_ingress).config
             self.internal_ingress.submit_to_traefik(internal_ingress_config)
@@ -354,6 +383,7 @@ class HydraCharm(CharmBase):
         return adjust_resource_requirements(limits, requests, adhere_to_requests=True)
 
     def _on_database_created(self, event: DatabaseCreatedEvent) -> None:
+        self.unit.status = MaintenanceStatus("Configuring resources")
         if not container_connectivity(self):
             self.unit.status = WaitingStatus("Container is not connected yet")
             event.defer()
@@ -393,9 +423,11 @@ class HydraCharm(CharmBase):
         self._holistic_handler(event)
 
     def _on_database_changed(self, event: DatabaseEndpointsChangedEvent) -> None:
+        self.unit.status = MaintenanceStatus("Configuring resources")
         self._holistic_handler(event)
 
     def _on_database_integration_broken(self, event: RelationBrokenEvent) -> None:
+        self.unit.status = MaintenanceStatus("Configuring resources")
         self._holistic_handler(event)
 
     def _on_oauth_integration_created(self, event: RelationEvent) -> None:
@@ -485,8 +517,6 @@ class HydraCharm(CharmBase):
             self.unit.status = WaitingStatus("Container is not connected yet")
             return
 
-        self.unit.status = MaintenanceStatus("Configuring resources")
-
         if not peer_integration_exists(self):
             self.unit.status = WaitingStatus(f"Missing integration {PEER_INTEGRATION_NAME}")
             event.defer()
@@ -512,6 +542,14 @@ class HydraCharm(CharmBase):
             self.unit.status = WaitingStatus("Waiting for ingress to be ready")
             return
 
+        public_ingress = PublicIngressData.load(self.public_ingress)
+        if not self.dev_mode and not public_ingress.secured:
+            self.unit.status = BlockedStatus(
+                "Requires a secure (HTTPS) public ingress. "
+                "Either enable HTTPS on public ingress or set 'dev' config to true for local development."
+            )
+            return
+
         if not LoginUIEndpointData.load(self.login_ui_requirer).is_ready():
             self.unit.status = WaitingStatus("Waiting for login UI to be ready")
             return
@@ -531,20 +569,21 @@ class HydraCharm(CharmBase):
             event.defer()
             return
 
-        self._pebble_service.push_config_file(
+        changed = self._pebble_service.update_config_file(
             ConfigFile.from_sources(
                 self.secrets,
                 self.charm_config,
                 DatabaseConfig.load(self.database_requirer),
                 LoginUIEndpointData.load(self.login_ui_requirer),
-                PublicIngressData.load(self.public_ingress),
-            )
+                public_ingress,
+                HydraHookData.load(self.token_hook),
+            ),
         )
 
         try:
-            self._pebble_service.plan(self._pebble_layer)
-        except PebbleServiceError:
-            logger.error("Failed to start the service, please check the container logs")
+            self._pebble_service.plan(self._pebble_layer, changed)
+        except PebbleServiceError as e:
+            logger.error(f"Failed to start the service, please check the container logs: {e}")
             self.unit.status = BlockedStatus(
                 f"Failed to restart the service, please check the {WORKLOAD_CONTAINER} logs"
             )

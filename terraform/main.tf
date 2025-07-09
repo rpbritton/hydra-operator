@@ -14,7 +14,7 @@ resource "juju_application" "hydra" {
   units       = var.units
 
   charm {
-    name     = "hydra-operator"
+    name     = "hydra"
     base     = var.base
     channel  = var.channel
     revision = var.revision
@@ -25,5 +25,5 @@ resource "juju_offer" "oauth_offer" {
   name             = "oauth-offer"
   model            = var.model_name
   application_name = juju_application.hydra.name
-  endpoint         = "oauth"
+  endpoints         = ["oauth"]
 }
